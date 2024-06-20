@@ -21,8 +21,8 @@ _____/\\\\\\\\\\\____/\\\\\\\\\\\\\\\__/\\\\\\\\\\\\\\\__/\\\________/\\\____/\\
         ___\///////////_____\///////////////__\///////////////__\///________\///__\///________\///__
 """
 
+# calculate ~ directory ~ size
 def get_directory_size(path):
-    # calculate ~ total size ~ directory
     total_size = 0
     for dirpath, _, filenames in os.walk(path):
         for f in filenames:
@@ -31,8 +31,8 @@ def get_directory_size(path):
                 total_size += os.path.getsize(fp)
     return total_size
 
+# scan ~ directories
 def scan_directories(directories):
-    # scan ~ report sizes ~ specific directories
     report = []
     for dir in track(directories, description="Scanning directories..."):
         if os.path.exists(dir):
@@ -40,12 +40,12 @@ def scan_directories(directories):
             report.append({"Directory": dir, "SizeMB": round(size / (1024 * 1024), 2)})
     return report
 
+# get ~ all ~ drives
 def get_all_drives():
-    # get ~ available ~ drives
     return [f"{chr(drive)}:\\" for drive in range(ord('A'), ord('Z') + 1) if os.path.exists(f"{chr(drive)}:\\")]
 
+# scan ~ drive
 def scan_drive(drive):
-    # scan and report ~ directories
     report = []
     for root, dirs, _ in track(os.walk(drive), description=f"Scanning drive {drive}..."):
         for d in dirs:
@@ -54,20 +54,27 @@ def scan_drive(drive):
             report.append({"Directory": dir_path, "SizeMB": round(size / (1024 * 1024), 2)})
     return report
 
+# visualize ~ storage
 def visualize_storage(report):
-    # visualize ~ report
+    if not report:
+        console.print("No data available to visualize.", style="bold red")
+        return
+
     table = Table(title="Top 20 Directories by Size")
     table.add_column("Directory", justify="left", style="cyan", no_wrap=True)
     table.add_column("Size (MB)", justify="right", style="magenta")
 
-    df = pd.DataFrame(report).sort_values(by="SizeMB", ascending=False).head(20)
-    for _, row in df.iterrows():
-        table.add_row(row["Directory"], str(row["SizeMB"]))
+    try:
+        df = pd.DataFrame(report).sort_values(by="SizeMB", ascending=False).head(20)
+        for _, row in df.iterrows():
+            table.add_row(row["Directory"], str(row["SizeMB"]))
+    except KeyError as e:
+        console.print(f"Error: {e}. Ensure the report contains 'SizeMB' key.", style="bold red")
 
     console.print(table)
 
+# generate ~ storage ~ report
 def generate_storage_report():
-    # generate ~ storage ~ report ~ all drives
     all_drives = get_all_drives()
     full_report = []
 
@@ -75,14 +82,18 @@ def generate_storage_report():
         if Confirm.ask(f"Do you want to scan drive {drive}?"):
             full_report.extend(scan_drive(drive))
 
+    if not full_report:
+        console.print("No data to generate report.", style="bold red")
+        return
+
     report_path = "M:\\storage_report.csv"
     pd.DataFrame(full_report).to_csv(report_path, index=False)
     console.print(f"Storage report generated at {report_path}", style="bold green")
 
     visualize_storage(full_report)
 
+# show ~ performance ~ metrics
 def show_performance_metrics():
-    # show ~ performance ~ metrics
     metrics = {
         "CPU Usage (%)": f"{psutil.cpu_percent(interval=1)}%",
         "Memory Usage (%)": f"{psutil.virtual_memory().percent}%",
@@ -104,8 +115,8 @@ def show_performance_metrics():
 
     console.print(table)
 
+# optimize ~ system ~ performance
 def optimize_performance():
-    # optimize ~ system ~ performance
     console.print("Starting system optimization...", style="bold yellow")
 
     optimization_steps = {
@@ -138,17 +149,17 @@ def optimize_performance():
 
     console.print("System optimization completed.", style="bold green")
 
+# display ~ mainmenu
 def main_menu():
-    # display ~ mainmenu
     console.print(LOGO, style="bold blue")
     while True:
-        console.print("Storage and Performance Analysis Tool", style="bold blue", justify="center")
-        console.print("[1] Scan specific directories")
-        console.print("[2] Scan all drives")
-        console.print("[3] Generate storage report")
-        console.print("[4] Show performance metrics")
-        console.print("[5] Optimize performance")
-        console.print("[6] Exit")
+        console.print("Storage and Performance Analysis Tool", style="bold cyan")
+        console.print("[1] Scan ~ specific directories")
+        console.print("[2] Scan ~ all drives")
+        console.print("[3] Generate ~ storage report")
+        console.print("[4] Show ~ performance metrics")
+        console.print("[5] Optimize ~ performance")
+        console.print("[6] exit ~ (っ◔◡◔)っ")
         
         choice = Prompt.ask("Choose an option", choices=["1", "2", "3", "4", "5", "6"], default="6")
         
