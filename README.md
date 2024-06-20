@@ -10,14 +10,14 @@ _____/\\\\\\\\\\\____/\\\\\\\\\\\\\\\__/\\\\\\\\\\\\\\\__/\\\________/\\\____/\\
        _\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\\\_\/\\\\\\\\\\\\\\\_\/\\\______\//\\\_\/\\\______\//\\\_ 
         ___\///////////_____\///////////////__\///////////////__\///________\///__\///________\///__
 ```
-~~~ Scan directories ~ Generate reports ~ Metrics ~ Optimize system ~~~
+## Scan directories ~ Generate reports ~ Metrics ~ Optimize system
 
 ## Goodies
-~~~ Scan Specific Directories ~ Analyze the size of specific directories. ~~~
-~~~ Scan All Drives ~ Analyze the size of directories across all drives. ~~~
-~~~ Generate Storage Report ~ Create a CSV report of directory sizes. ~~~
-~~~ Show Performance Metrics ~ Display CPU, memory, and disk usage metrics. ~~~
-~~~ Optimize Performance ~ Perform various system optimization tasks. ~~~
+- Scan Specific Directories ~ Analyze the size of specific directories
+- Scan All Drives ~ Analyze the size of directories across all drives
+- Generate Storage Report ~ Create a CSV report of directory sizes
+- Show Performance Metrics ~ Display CPU, memory, and disk usage metrics
+- Optimize Performance ~ Perform various system optimization tasks
 
 ## how2
 
