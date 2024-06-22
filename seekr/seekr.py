@@ -1,11 +1,14 @@
-import os
-import pandas as pd
-import psutil
-import subprocess
+import asyncio
 from rich.console import Console
-from rich.table import Table
-from rich.progress import track
 from rich.prompt import Prompt, Confirm
+from skr_tools import (
+    scan_directories, get_all_drives, scan_drive, visualize_storage,
+    generate_storage_report, show_performance_metrics, optimize_performance
+)
+from skr_network import (
+    get_local_ip, get_network_interface, get_network_range, async_scan_network,
+    display_devices, scan_single_device, scan_all_devices
+)
 
 console = Console()
 
@@ -21,165 +24,124 @@ _____/\\\\\\\\\\\____/\\\\\\\\\\\\\\\__/\\\\\\\\\\\\\\\__/\\\________/\\\____/\\
         ___\///////////_____\///////////////__\///////////////__\///________\///__\///________\///__
 """
 
-# calculate ~ directory ~ size
-def get_directory_size(path):
-    total_size = 0
-    for dirpath, _, filenames in os.walk(path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            if os.path.exists(fp):
-                total_size += os.path.getsize(fp)
-    return total_size
-
-# scan ~ directories
-def scan_directories(directories):
-    report = []
-    for dir in track(directories, description="Scanning directories..."):
-        if os.path.exists(dir):
-            size = get_directory_size(dir)
-            report.append({"Directory": dir, "SizeMB": round(size / (1024 * 1024), 2)})
-    return report
-
-# get ~ all ~ drives
-def get_all_drives():
-    return [f"{chr(drive)}:\\" for drive in range(ord('A'), ord('Z') + 1) if os.path.exists(f"{chr(drive)}:\\")]
-
-# scan ~ drive
-def scan_drive(drive):
-    report = []
-    for root, dirs, _ in track(os.walk(drive), description=f"Scanning drive {drive}..."):
-        for d in dirs:
-            dir_path = os.path.join(root, d)
-            size = get_directory_size(dir_path)
-            report.append({"Directory": dir_path, "SizeMB": round(size / (1024 * 1024), 2)})
-    return report
-
-# visualize ~ storage
-def visualize_storage(report):
-    if not report:
-        console.print("No data available to visualize.", style="bold red")
-        return
-
-    table = Table(title="Top 20 Directories by Size")
-    table.add_column("Directory", justify="left", style="cyan", no_wrap=True)
-    table.add_column("Size (MB)", justify="right", style="magenta")
-
-    try:
-        df = pd.DataFrame(report).sort_values(by="SizeMB", ascending=False).head(20)
-        for _, row in df.iterrows():
-            table.add_row(row["Directory"], str(row["SizeMB"]))
-    except KeyError as e:
-        console.print(f"Error: {e}. Ensure the report contains 'SizeMB' key.", style="bold red")
-
-    console.print(table)
-
-# generate ~ storage ~ report
-def generate_storage_report():
-    all_drives = get_all_drives()
-    full_report = []
-
-    for drive in all_drives:
-        if Confirm.ask(f"Do you want to scan drive {drive}?"):
-            full_report.extend(scan_drive(drive))
-
-    if not full_report:
-        console.print("No data to generate report.", style="bold red")
-        return
-
-    report_path = "M:\\storage_report.csv"
-    pd.DataFrame(full_report).to_csv(report_path, index=False)
-    console.print(f"Storage report generated at {report_path}", style="bold green")
-
-    visualize_storage(full_report)
-
-# show ~ performance ~ metrics
-def show_performance_metrics():
-    metrics = {
-        "CPU Usage (%)": f"{psutil.cpu_percent(interval=1)}%",
-        "Memory Usage (%)": f"{psutil.virtual_memory().percent}%",
-        "Total Memory (GB)": f"{psutil.virtual_memory().total / (1024**3):.2f}",
-        "Available Memory (GB)": f"{psutil.virtual_memory().available / (1024**3):.2f}",
-        "Used Memory (GB)": f"{psutil.virtual_memory().used / (1024**3):.2f}",
-        "Disk Usage (%)": f"{psutil.disk_usage('/').percent}%",
-        "Total Disk Space (GB)": f"{psutil.disk_usage('/').total / (1024**3):.2f}",
-        "Used Disk Space (GB)": f"{psutil.disk_usage('/').used / (1024**3):.2f}",
-        "Free Disk Space (GB)": f"{psutil.disk_usage('/').free / (1024**3):.2f}"
-    }
-
-    table = Table(title="PC Performance Metrics")
-    table.add_column("Metric", justify="left", style="cyan", no_wrap=True)
-    table.add_column("Value", justify="right", style="magenta")
-
-    for metric, value in metrics.items():
-        table.add_row(metric, value)
-
-    console.print(table)
-
-# optimize ~ system ~ performance
-def optimize_performance():
-    console.print("Starting system optimization...", style="bold yellow")
-
-    optimization_steps = {
-        "- Close unnecessary applications.": ["taskkill /F /IM application_name.exe"],
-        "- Clean up temporary files.": ["cleanmgr", "/sagerun:1"],
-        "- Uninstall unused programs.": ["appwiz.cpl"],
-        "- Defragment your disk (if using HDD).": ["dfrgui"],
-        "- Enable Storage Sense for automatic cleanup.": ["start ms-settings:storagesense"],
-        "- Configure ReadyBoost (if applicable).": ["Insert a USB flash drive and configure ReadyBoost through its properties in File Explorer."],
-        "- Perform malware scan.": ["start ms-settings:windowsdefender"],
-        "- Update system and drivers.": ["start ms-settings:windowsupdate"],
-        "- Adjust visual effects for better performance.": ["sysdm.cpl"],
-        "- Disable unnecessary startup programs.": ["taskmgr"],
-        "- Check for disk errors.": ["chkdsk /f C:"],
-        "- Enable Fast Startup.": ["powercfg /hibernate on", "powercfg -h off", "powercfg -h on"],
-        "- Clear browser cache.": ["Open your browser settings and clear cache, cookies, and browsing history."],
-        "- Optimize SSD (if applicable).": ["defrag /C /O"]
-    }
-
-    for step, command in optimization_steps.items():
-        console.print(step)
-        if isinstance(command, list):
-            for cmd in command:
-                if cmd.startswith("Open"):
-                    console.print(cmd)
-                else:
-                    subprocess.run(cmd.split())
-        else:
-            console.print(command)
-
-    console.print("System optimization completed.", style="bold green")
-
-# display ~ mainmenu
-def main_menu():
-    console.print(LOGO, style="bold blue")
+async def storage_menu():
     while True:
-        console.print("Storage and Performance Analysis Tool", style="bold cyan")
-        console.print("[1] Scan ~ specific directories")
-        console.print("[2] Scan ~ all drives")
-        console.print("[3] Generate ~ storage report")
-        console.print("[4] Show ~ performance metrics")
-        console.print("[5] Optimize ~ performance")
-        console.print("[6] exit ~ (っ◔◡◔)っ")
-        
-        choice = Prompt.ask("Choose an option", choices=["1", "2", "3", "4", "5", "6"], default="6")
-        
-        if choice == "1":
+        console.print("\n[bold cyan]Storage Analysis Menu:[/bold cyan]")
+        console.print("1. Scan specific directories")
+        console.print("2. Scan all drives")
+        console.print("3. Generate storage report")
+        console.print("4. Return to main menu")
+
+        storage_choice = Prompt.ask("Enter your choice", choices=["1", "2", "3", "4"], default="4")
+
+        if storage_choice == '1':
             directories = Prompt.ask("Enter directories to scan (comma-separated)", default="C:\\").split(',')
             report = scan_directories([d.strip() for d in directories])
             visualize_storage(report)
-        elif choice == "2":
+        elif storage_choice == '2':
             for drive in get_all_drives():
                 if Confirm.ask(f"Do you want to scan drive {drive}?"):
                     visualize_storage(scan_drive(drive))
-        elif choice == "3":
+        elif storage_choice == '3':
             generate_storage_report()
-        elif choice == "4":
+        elif storage_choice == '4':
+            break
+
+async def performance_menu():
+    while True:
+        console.print("\n[bold cyan]Performance Analysis Menu:[/bold cyan]")
+        console.print("1. Show performance metrics")
+        console.print("2. Optimize system performance")
+        console.print("3. Return to main menu")
+
+        performance_choice = Prompt.ask("Enter your choice", choices=["1", "2", "3"], default="3")
+
+        if performance_choice == '1':
             show_performance_metrics()
-        elif choice == "5":
+        elif performance_choice == '2':
             optimize_performance()
-        elif choice == "6":
-            console.print("Exiting the tool. Goodbye!", style="bold red")
+        elif performance_choice == '3':
+            break
+
+async def network_menu():
+    local_ip = get_local_ip()
+    if not local_ip:
+        return
+
+    network_interface = get_network_interface(local_ip)
+    network_range = get_network_range(local_ip)
+
+    console.print(f"[bold cyan]Local IP Address: {local_ip}[/bold cyan]")
+    console.print(f"[bold cyan]Network Interface: {network_interface}[/bold cyan]")
+    console.print(f"[bold cyan]Network Range: {network_range}[/bold cyan]")
+
+    if not network_range:
+        return
+
+    devices = await async_scan_network(network_range)
+
+    if not devices:
+        return
+
+    while True:
+        console.print("\n[bold cyan]Network Menu:[/bold cyan]")
+        console.print("1. Display discovered devices")
+        console.print("2. Scan a single device")
+        console.print("3. Scan all devices")
+        console.print("4. Rescan network")
+        console.print("5. Return to main menu")
+
+        choice = Prompt.ask("Enter your choice", choices=["1", "2", "3", "4", "5"], default="5")
+
+        if choice == '1':
+            display_devices(devices)
+        elif choice == '2':
+            display_devices(devices)
+            device_choice = Prompt.ask("Enter the number of the device to scan (or 'b' to go back)")
+            if device_choice.lower() == 'b':
+                continue
+            try:
+                device_index = int(device_choice) - 1
+                if 0 <= device_index < len(devices):
+                    await scan_single_device(devices[device_index]['ip'])
+                else:
+                    console.print("[bold red]Invalid device number.[/bold red]")
+            except ValueError:
+                console.print("[bold red]Invalid input. Please enter a number or 'b'.[/bold red]")
+        elif choice == '3':
+            await scan_all_devices(devices)
+        elif choice == '4':
+            devices = await async_scan_network(network_range)
+            if devices:
+                display_devices(devices)
+            else:
+                console.print("[bold yellow]No devices found after rescan.[/bold yellow]")
+        elif choice == '5':
+            break
+
+async def main_menu():
+    while True:
+        console.print(LOGO, style="bold blue")
+        console.print("\n[bold cyan]Main Menu:[/bold cyan]")
+        console.print("1. Storage Analysis")
+        console.print("2. Performance Analysis")
+        console.print("3. Network Analysis")
+        console.print("4. Exit")
+
+        choice = Prompt.ask("Enter your choice", choices=["1", "2", "3", "4"], default="4")
+
+        if choice == '1':
+            await storage_menu()
+        elif choice == '2':
+            await performance_menu()
+        elif choice == '3':
+            await network_menu()
+        elif choice == '4':
+            console.print("[bold cyan]Exiting SEEKR. Goodbye![/bold cyan]")
             break
 
 if __name__ == "__main__":
-    main_menu()
+    try:
+        asyncio.run(main_menu())
+    except KeyboardInterrupt:
+        console.print("\n[bold cyan]Program interrupted. Exiting...[/bold cyan]")
