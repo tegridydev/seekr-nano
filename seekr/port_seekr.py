@@ -1,12 +1,15 @@
 import asyncio
 import socket
+import ssl
 import psutil
 from rich.console import Console
 from rich.table import Table
-from rich.progress import Progress, TaskID
+from rich.progress import Progress
 from scapy.all import ARP, Ether, srp
 import ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import requests
+from urllib.parse import urlparse
 
 console = Console()
 
@@ -92,12 +95,104 @@ def check_open_ports(target, port_range=(1, 1000)):
                     console.print(f"[bold red]An error occurred while scanning port {port}: {str(e)}[/bold red]")
     return open_ports
 
+def get_service_name(port):
+    try:
+        return socket.getservbyport(port)
+    except OSError:
+        return "Unknown"
+
+def get_ssl_info(ip, port):
+    try:
+        context = ssl.create_default_context()
+        with socket.create_connection((ip, port), timeout=3) as sock:
+            with context.wrap_socket(sock, server_hostname=ip) as secure_sock:
+                cert = secure_sock.getpeercert()
+                return {
+                    "Issuer": dict(x[0] for x in cert['issuer']),
+                    "Subject": dict(x[0] for x in cert['subject']),
+                    "Version": cert['version'],
+                    "Serial Number": cert['serialNumber'],
+                }
+    except Exception as e:
+        return f"SSL Error: {str(e)}"
+
+def get_http_info(ip, port):
+    try:
+        url = f"http://{ip}:{port}"
+        response = requests.get(url, timeout=3)
+        return {
+            "Status Code": response.status_code,
+            "Server": response.headers.get('Server', 'Unknown'),
+            "Content-Type": response.headers.get('Content-Type', 'Unknown'),
+        }
+    except requests.RequestException as e:
+        return f"HTTP Error: {str(e)}"
+
+def analyze_port(ip, port):
+    service_name = get_service_name(port)
+    result = {
+        "Port": port,
+        "Service": service_name,
+        "SSL Info": None,
+        "HTTP Info": None,
+    }
+
+    if service_name in ['https', 'ssl']:
+        result["SSL Info"] = get_ssl_info(ip, port)
+
+    if service_name in ['http', 'https']:
+        result["HTTP Info"] = get_http_info(ip, port)
+
+    return result
+
+def closer_look(ip, open_ports):
+    console.print(f"\n[bold cyan]Performing a closer look at open ports on {ip}...[/bold cyan]")
+    results = []
+
+    with Progress() as progress:
+        task = progress.add_task("[cyan]Analyzing ports...", total=len(open_ports))
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_port = {executor.submit(analyze_port, ip, port): port for port in open_ports}
+            for future in as_completed(future_to_port):
+                port = future_to_port[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    console.print(f"[bold red]An error occurred while analyzing port {port}: {str(e)}[/bold red]")
+                progress.update(task, advance=1)
+
+    display_analysis_results(results)
+
+def display_analysis_results(results):
+    table = Table(title="Port Analysis Results")
+    table.add_column("Port", style="cyan")
+    table.add_column("Service", style="magenta")
+    table.add_column("SSL Info", style="green")
+    table.add_column("HTTP Info", style="yellow")
+
+    for result in results:
+        ssl_info = str(result["SSL Info"]) if result["SSL Info"] else "N/A"
+        http_info = str(result["HTTP Info"]) if result["HTTP Info"] else "N/A"
+        table.add_row(
+            str(result["Port"]),
+            result["Service"],
+            ssl_info,
+            http_info
+        )
+
+    console.print(table)
+
 async def scan_single_device(target):
     console.print(f"\n[bold cyan]Scanning {target}...[/bold cyan]")
     open_ports = check_open_ports(target)
 
     if open_ports:
         console.print(f"\n[bold green]Open ports on {target}:[/bold green] {sorted(open_ports)}")
+        choice = input("Do you want to take a closer look at these ports? (y/n): ")
+        if choice.lower() == 'y':
+            closer_look(target, open_ports)
     else:
         console.print("\n[bold yellow]No open ports found.[/bold yellow]")
 
