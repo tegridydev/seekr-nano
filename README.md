@@ -1,4 +1,4 @@
-# seekr
+# seekr~nano
 
 ## Scan directories|networks ~ Generate reports ~ Metrics ~ Optimize system
 
